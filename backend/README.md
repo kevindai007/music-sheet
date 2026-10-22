@@ -46,7 +46,7 @@
 cd backend
 npm install
 cp .dev.vars.example .dev.vars   # 填入 ANTHROPIC_API_KEY 和自定义的 APP_TOKEN
-npm run dev                      # 启动在 http://localhost:8787
+npm run dev                      # 启动在 http://localhost:8787（真机调试用 npm run dev:lan）
 
 curl -X POST http://localhost:8787/songs/generate \
   -H "Content-Type: application/json" -H "X-App-Token: <你的 APP_TOKEN>" \

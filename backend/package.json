@@ -4,6 +4,7 @@
   "description": "Backend for the music-sheet iPhone app: fetches lyrics and asks Claude for chords.",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:lan": "wrangler dev --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc"
