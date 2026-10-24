@@ -2,9 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Filled from MUSIC_SHEET_APP_TOKEN in Secrets.xcconfig at build time. -->
+	<!-- Filled from Config.xcconfig / Secrets.xcconfig at build time. -->
 	<key>MusicSheetAppToken</key>
 	<string>$(MUSIC_SHEET_APP_TOKEN)</string>
+	<key>MusicSheetGoogleClientID</key>
+	<string>$(MUSIC_SHEET_GOOGLE_CLIENT_ID)</string>
+	<key>MusicSheetAppleSignIn</key>
+	<string>$(MUSIC_SHEET_APPLE_SIGNIN)</string>
 	<!-- Lets the app reach a backend running on your Mac over plain HTTP during development. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

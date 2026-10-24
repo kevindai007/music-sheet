@@ -172,5 +172,64 @@ import Testing
         #expect(throws: APIClient.APIError.server(status: 502, message: nil)) {
             try APIClient.decodeSheetResponse(status: 502, data: Data("oops".utf8))
         }
+        let quota = Data(#"{"error":"quota_exceeded","message":"今天的 20 次 AI 生成已经用完了"}"#.utf8)
+        #expect(throws: APIClient.APIError.quotaExceeded("今天的 20 次 AI 生成已经用完了")) {
+            try APIClient.decodeSheetResponse(status: 429, data: quota)
+        }
+        // An AI rate limit is also a 429, but not the user's quota.
+        let rateLimited = Data(#"{"error":"chords_failed","code":"rate_limited","message":"slow down"}"#.utf8)
+        #expect(throws: APIClient.APIError.server(status: 429, message: "slow down")) {
+            try APIClient.decodeSheetResponse(status: 429, data: rateLimited)
+        }
+    }
+
+    @Test func decodesAuthResponses() throws {
+        let signIn = Data(#"{"sessionToken":"s","expiresAt":"2026-11-23T00:00:00.000Z","user":{"id":"apple:1","email":null}}"#.utf8)
+        let result: APIClient.SignInResult = try APIClient.decodeResponse(status: 200, data: signIn)
+        #expect(result.user == .init(id: "apple:1", email: nil))
+
+        let me = Data(#"{"user":null,"owner":true,"usage":{"used":0,"limit":null}}"#.utf8)
+        let account: APIClient.Account = try APIClient.decodeResponse(status: 200, data: me)
+        #expect(account.owner && account.usage.limit == nil)
+    }
+}
+
+@Suite struct GoogleOAuthTests {
+    let google = GoogleOAuth(clientID: "123-abc.apps.googleusercontent.com")
+
+    @Test func redirectUsesReversedClientID() {
+        #expect(google.callbackScheme == "com.googleusercontent.apps.123-abc")
+        #expect(google.redirectURI == "com.googleusercontent.apps.123-abc:/oauthredirect")
+        let url = google.authorizationURL(state: "st", codeChallenge: "ch")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+        #expect(items.contains(.init(name: "code_challenge_method", value: "S256")))
+        #expect(items.contains(.init(name: "redirect_uri", value: google.redirectURI)))
+    }
+
+    @Test func pkceChallengeMatchesRFC7636() {
+        #expect(GoogleOAuth.codeChallenge(for: "dBjftJeZ4CVP-mJ92K9qkt0Ei4RsS4y3_SrGq-LQ_9s")
+            == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        let token = GoogleOAuth.randomToken()
+        #expect(token.count == 43 && !token.contains("=") && token != GoogleOAuth.randomToken())
+    }
+
+    @Test func readsTheCallback() throws {
+        let ok = URL(string: "com.googleusercontent.apps.123-abc:/oauthredirect?state=st&code=4/abc")!
+        #expect(try google.code(fromCallback: ok, expectedState: "st") == "4/abc")
+        #expect(throws: GoogleOAuth.OAuthError.invalidCallback) {
+            try google.code(fromCallback: ok, expectedState: "other")
+        }
+        let denied = URL(string: "com.googleusercontent.apps.123-abc:/oauthredirect?error=access_denied&state=st")!
+        #expect(throws: GoogleOAuth.OAuthError.cancelled) {
+            try google.code(fromCallback: denied, expectedState: "st")
+        }
+    }
+
+    @Test func tokenRequestIsFormEncoded() throws {
+        let request = google.tokenRequest(code: "4/a+b", codeVerifier: "v")
+        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        #expect(body.contains("grant_type=authorization_code"))
+        #expect(body.contains("code_verifier=v"))
+        #expect(!body.contains("4/a+b")) // "+" must be escaped or Google reads it as a space
     }
 }

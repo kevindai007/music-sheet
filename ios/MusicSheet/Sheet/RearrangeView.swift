@@ -7,6 +7,7 @@ struct RearrangeView: View {
     var onRearranged: (SongSheet) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AuthStore.self) private var auth
     @State private var selected: ArrangementStyle?
     @State private var custom = ""
     @State private var isWorking = false
@@ -88,7 +89,7 @@ struct RearrangeView: View {
         task = Task {
             defer { isWorking = false }
             do {
-                var result = try await AppSettings.makeClient().rearrange(sheet, style: prompt)
+                var result = try await auth.makeClient().rearrange(sheet, style: prompt)
                 if let label { result.arrangement = .init(style: label) }
                 onRearranged(result)
                 dismiss()
@@ -97,6 +98,7 @@ struct RearrangeView: View {
             } catch let error as URLError where error.code == .cancelled {
                 // The user cancelled.
             } catch {
+                auth.handle(error)
                 errorMessage = error.localizedDescription
             }
         }

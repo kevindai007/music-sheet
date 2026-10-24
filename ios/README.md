@@ -25,19 +25,28 @@ cd ios
 2. 通过 ssh 从服务器读取 `APP_TOKEN`，写进 `ios/Secrets.xcconfig`。这个文件不提交到仓库，读不到时会让你粘贴。
 3. 生成并打开 `MusicSheet.xcodeproj`。这个文件也不提交。
 
-这样装到手机上的 App 已经内置了服务器地址和 Token，打开就能用，不用再填任何东西。以后只是改了代码、Token 没变的话，直接在 Xcode 里点运行，或者执行 `xcodegen` 就行。服务器上换了 Token 的话，删掉 `Secrets.xcconfig` 再运行一次 `./setup.sh`。
+这样从 Xcode 装到手机上的 App（Debug 版）已经内置了服务器地址和开发者 Token，打开就能用，不用登录也不限次数。Release 版（比如上架用的 Archive）不会带这个 Token，用户需要登录。以后只是改了代码、Token 没变的话，直接在 Xcode 里点运行，或者执行 `xcodegen` 就行。服务器上换了 Token 的话，删掉 `Secrets.xcconfig` 再运行一次 `./setup.sh`。
 
 1. 在 Xcode 里选中 MusicSheet target → Signing & Capabilities → Team 选你的 Apple ID（免费账号也可以）。
 2. 先选一个 iPhone 模拟器，点运行。
 3. 想装到自己的 iPhone 上：用数据线连上手机，在顶部设备列表里选它，再点运行。第一次需要在手机的"设置 → 通用 → VPN 与设备管理"里信任开发者，并打开"开发者模式"。
 
+## 登录
+
+AI 生成和改编需要登录，已保存的曲谱不登录也能看。每人每天的次数由后端的 `DAILY_LIMIT` 控制。设置里可以退出登录和删除账号（App Store 要求有删除账号的入口）。
+
+登录方式在 `Config.xcconfig` 里开启：
+
+- **Google**：在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建一个 "iOS" 类型的 OAuth 客户端，Bundle ID 填 `com.kevindai.musicsheet`。把得到的客户端 ID（形如 `123-abc.apps.googleusercontent.com`）填到 `MUSIC_SHEET_GOOGLE_CLIENT_ID`，同时填到 GitHub 仓库 Environment `oracle-node1` 的变量 `GOOGLE_CLIENT_IDS`，然后重新部署后端。App 不需要 Google SDK，用的是系统自带的网页登录（PKCE）。
+- **Apple**：需要付费的 Apple Developer Program（每年 99 美元）。加入后把 `MUSIC_SHEET_APPLE_SIGNIN` 改成 `YES`，重新执行 `xcodegen`，Xcode 会自动给 App ID 开启 Sign in with Apple。后端不用改。上架时如果提供了 Google 登录，就必须同时提供 Apple 登录。
+
 ## 连接后端
 
-默认连接 `https://app.kevinonline.org`，Token 在构建时就内置好了，不需要设置。只有本地调试时才需要打开 App → 左上角设置 → 调试设置：
+默认连接 `https://app.kevinonline.org`，不需要设置。只有本地调试时才需要打开 App → 左上角设置 → 调试设置：
 
 - **模拟器**：后端用 `npm run dev` 启动，地址填 `http://localhost:8787`。
 - **真机**：后端用 `npm run dev:lan` 启动，地址填 Mac 的局域网 IP，例如 `http://192.168.1.10:8787`（在"系统设置 → Wi-Fi → 详细信息"里查看）。第一次请求时 iPhone 会询问是否允许访问本地网络，选允许。也可以把后端部署到 Cloudflare，直接填 Worker 的 https 地址。
-- **App Token**：留空就用内置的；连本地后端时填 `.dev.vars` 里的 `APP_TOKEN`。点"恢复默认"可以回到服务器。
+- **开发者 Token**：留空就用内置的；连本地后端时填 `.dev.vars` 里的 `APP_TOKEN`。点"恢复默认"可以回到服务器。
 
 ### HTTPS 说明
 
@@ -47,4 +56,4 @@ iOS 默认只允许 App 用 HTTPS 访问公网地址，`http://` 只放行了本
 
 - `MusicSheetKit/`：不依赖 UI 的逻辑（曲谱模型、和弦解析与变调、级数、滚动时间轴、后端客户端），附单元测试：`swift test --package-path MusicSheetKit`。
 - `MusicSheet/`：SwiftUI 界面和 SwiftData 曲库。
-- `project.yml`：XcodeGen 配置。`Config.xcconfig` 会引入 `Secrets.xcconfig` 里的 Token。
+- `project.yml`：XcodeGen 配置。`Config.xcconfig` 放登录开关，并引入 `Secrets.xcconfig` 里的开发者 Token。
