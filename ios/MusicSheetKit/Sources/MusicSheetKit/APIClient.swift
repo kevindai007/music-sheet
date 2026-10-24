@@ -119,8 +119,9 @@ public struct APIClient: Sendable {
         try decodeResponse(status: status, data: data)
     }
 
+    private struct ErrorBody: Decodable { var error: String; var message: String? }
+
     static func decodeResponse<T: Decodable>(status: Int, data: Data) throws -> T {
-        struct ErrorBody: Decodable { var error: String; var message: String? }
         switch status {
         case 200:
             do { return try JSONDecoder().decode(T.self, from: data) } catch { throw APIError.invalidResponse }
