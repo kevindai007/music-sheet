@@ -31,23 +31,33 @@ public struct APIClient: Sendable {
         }
     }
 
-    /// Fetches lyrics and has Claude add chords. Usually takes 20–60 seconds.
+    /// Fetches lyrics and has the AI add chords. Usually takes 20–60 seconds.
     public func generateSong(title: String, artist: String?) async throws -> SongSheet {
-        var request = URLRequest(url: baseURL.appendingPathComponent("songs/generate"))
+        var body = ["title": title]
+        if let artist, !artist.isEmpty { body["artist"] = artist }
+        return try await postSheet(path: "songs/generate", body: body)
+    }
+
+    /// Asks the AI to re-chord `sheet` in `style`. Lyrics and sections stay the same.
+    public func rearrange(_ sheet: SongSheet, style: String) async throws -> SongSheet {
+        struct Body: Encodable { var sheet: SongSheet; var style: String }
+        return try await postSheet(path: "songs/rearrange", body: Body(sheet: sheet, style: style))
+    }
+
+    private func postSheet(path: String, body: some Encodable) async throws -> SongSheet {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
         request.timeoutInterval = 180
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(token, forHTTPHeaderField: "X-App-Token")
-        var body = ["title": title]
-        if let artist, !artist.isEmpty { body["artist"] = artist }
         request.httpBody = try JSONEncoder().encode(body)
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
-        return try Self.decodeGenerateResponse(status: http.statusCode, data: data)
+        return try Self.decodeSheetResponse(status: http.statusCode, data: data)
     }
 
-    static func decodeGenerateResponse(status: Int, data: Data) throws -> SongSheet {
+    static func decodeSheetResponse(status: Int, data: Data) throws -> SongSheet {
         struct ErrorBody: Decodable { var error: String; var message: String? }
         switch status {
         case 200:

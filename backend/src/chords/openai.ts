@@ -1,8 +1,7 @@
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { ChordAnnotationSchema, type Lyrics } from "../types";
-import { buildUserPrompt, SYSTEM_PROMPT } from "./prompt";
-import { ChordAnnotationError, type ChordProvider } from "./provider";
+import { ChordAnnotationSchema } from "../types";
+import { ChordAnnotationError, type ChordPrompt, type ChordProvider } from "./provider";
 
 export const DEFAULT_OPENAI_MODEL = "gpt-5.5";
 
@@ -14,13 +13,13 @@ export function createOpenAIProvider(apiKey: string, model = DEFAULT_OPENAI_MODE
   return {
     name: "openai",
     model,
-    async annotate(lyrics: Lyrics) {
+    async generate({ system, user }: ChordPrompt) {
       let response;
       try {
         response = await client.responses.parse({
           model,
-          instructions: SYSTEM_PROMPT,
-          input: buildUserPrompt(lyrics),
+          instructions: system,
+          input: user,
           text: { format: zodTextFormat(ChordAnnotationSchema, "chord_annotation") },
         });
       } catch (err) {

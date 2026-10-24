@@ -1,8 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { ChordAnnotationSchema, type Lyrics } from "../types";
-import { buildUserPrompt, SYSTEM_PROMPT } from "./prompt";
-import { ChordAnnotationError, type ChordProvider } from "./provider";
+import { ChordAnnotationSchema } from "../types";
+import { ChordAnnotationError, type ChordPrompt, type ChordProvider } from "./provider";
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
 
@@ -14,14 +13,14 @@ export function createAnthropicProvider(apiKey: string, model = DEFAULT_ANTHROPI
   return {
     name: "anthropic",
     model,
-    async annotate(lyrics: Lyrics) {
+    async generate({ system, user }: ChordPrompt) {
       let response;
       try {
         response = await client.beta.messages.parse({
           model,
           max_tokens: 16000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: buildUserPrompt(lyrics) }],
+          system,
+          messages: [{ role: "user", content: user }],
           output_config: { effort: "high", format: betaZodOutputFormat(ChordAnnotationSchema) },
           // Re-run a safety-classifier decline on Anthropic's recommended fallback model.
           fallbacks: "default",

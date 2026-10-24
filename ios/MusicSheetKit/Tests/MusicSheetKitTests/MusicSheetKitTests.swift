@@ -125,7 +125,7 @@ import Testing
 @Suite struct APIClientTests {
     @Test func decodesSheet() throws {
         let data = try JSONEncoder().encode(SampleSongs.twinkle)
-        let sheet = try APIClient.decodeGenerateResponse(status: 200, data: data)
+        let sheet = try APIClient.decodeSheetResponse(status: 200, data: data)
         #expect(sheet == SampleSongs.twinkle)
     }
 
@@ -136,21 +136,41 @@ import Testing
          "lyricsSource":{"provider":"lrclib","synced":true},
          "sections":[{"name":"主歌","lines":[{"timeMs":29350,"text":"故事的小黄花","chords":[{"at":0,"chord":"G"}]}]}]}
         """
-        let sheet = try APIClient.decodeGenerateResponse(status: 200, data: Data(json.utf8))
+        let sheet = try APIClient.decodeSheetResponse(status: 200, data: Data(json.utf8))
         #expect(sheet.sections[0].lines[0].chords == [.init(at: 0, chord: "G")])
         #expect(sheet.album == nil)
+        #expect(sheet.arrangement == nil)
+    }
+
+    @Test func decodesArrangementAndProvider() throws {
+        var original = SampleSongs.twinkle
+        original.arrangement = .init(style: "爵士")
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as! [String: Any]
+        json["generatedBy"] = ["provider": "openai", "model": "gpt-5.5"]
+        let sheet = try APIClient.decodeSheetResponse(status: 200, data: JSONSerialization.data(withJSONObject: json))
+        #expect(sheet.arrangement?.style == "爵士")
+        #expect(sheet.generatedBy?.provider == "openai")
+    }
+
+    @Test func encodesSheetForRearrange() throws {
+        // The backend validates these fields, so the app must send them all.
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(SampleSongs.twinkle)) as! [String: Any]
+        for key in ["title", "artist", "key", "capo", "bpm", "timeSignature", "strumming", "confidence", "notes",
+                    "introChords", "lyricsSource", "sections"] {
+            #expect(json[key] != nil, "missing \(key)")
+        }
     }
 
     @Test func mapsErrors() {
         #expect(throws: APIClient.APIError.unauthorized) {
-            try APIClient.decodeGenerateResponse(status: 401, data: Data())
+            try APIClient.decodeSheetResponse(status: 401, data: Data())
         }
         let notFound = Data(#"{"error":"lyrics_not_found","message":"没有找到《x》的歌词"}"#.utf8)
         #expect(throws: APIClient.APIError.lyricsNotFound("没有找到《x》的歌词")) {
-            try APIClient.decodeGenerateResponse(status: 404, data: notFound)
+            try APIClient.decodeSheetResponse(status: 404, data: notFound)
         }
         #expect(throws: APIClient.APIError.server(status: 502, message: nil)) {
-            try APIClient.decodeGenerateResponse(status: 502, data: Data("oops".utf8))
+            try APIClient.decodeSheetResponse(status: 502, data: Data("oops".utf8))
         }
     }
 }

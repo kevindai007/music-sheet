@@ -1,0 +1,91 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/music-sheet-api
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Same environment as story-teller: PROD_HOST, PROD_USER, PROD_SSH_KEY, plus the app's own secrets.
+    environment: oracle-node1
+    permissions:
+      packages: read
+    steps:
+      - name: Replace story-teller with music-sheet-api
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE: ${{ env.IMAGE }}:${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,APP_TOKEN,ANTHROPIC_API_KEY,OPENAI_API_KEY,AI_PROVIDER,ANTHROPIC_MODEL,OPENAI_MODEL
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$IMAGE"
+            docker logout ghcr.io
+
+            # The app's settings live in a file only the deploy user can read.
+            umask 077
+            cat > ~/music-sheet-api.env <<ENV
+            APP_TOKEN=$APP_TOKEN
+            ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+            OPENAI_API_KEY=$OPENAI_API_KEY
+            AI_PROVIDER=$AI_PROVIDER
+            ANTHROPIC_MODEL=$ANTHROPIC_MODEL
+            OPENAI_MODEL=$OPENAI_MODEL
+            ENV
+
+            # story-teller is retired: remove its containers (by image or by name) and the previous music-sheet-api.
+            old=$( (docker ps -aq --filter ancestor=ghcr.io/kevindai007/story-teller/story-teller:latest; \
+                    docker ps -aq --filter name=story-teller) | sort -u)
+            if [ -n "$old" ]; then docker rm -f $old; fi
+            docker rm -f music-sheet-api 2>/dev/null || true
+
+            docker run -d --name music-sheet-api --restart unless-stopped \
+              -p 8080:8080 --env-file ~/music-sheet-api.env "$IMAGE"
+            docker image prune -f
+
+            for i in $(seq 1 10); do
+              if docker exec music-sheet-api wget -qO- http://127.0.0.1:8080/health; then exit 0; fi
+              sleep 2
+            done
+            echo "music-sheet-api did not become healthy"; docker logs --tail 50 music-sheet-api; exit 1

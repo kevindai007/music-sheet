@@ -21,6 +21,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Build Docker image
+        run: docker build -t music-sheet-api .
 
   ios:
     runs-on: macos-15
