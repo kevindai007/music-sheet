@@ -89,6 +89,16 @@ struct SongSheetView: View {
         .onDisappear { clock.pause() }
     }
 
+    private func lyricsSourceLabel(_ source: SongSheet.LyricsSource) -> String {
+        let name = switch source.provider {
+        case "lrclib": "LRCLIB"
+        case "netease": "网易云音乐"
+        case "sample": "示例"
+        default: source.provider
+        }
+        return "歌词来源：\(name)\(source.synced ? "（带时间轴）" : "")"
+    }
+
     private func header(_ sheet: SongSheet, key: MusicalKey?, format: (String) -> String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -121,6 +131,9 @@ struct SongSheetView: View {
             if !sheet.notes.isEmpty {
                 Text(sheet.notes).font(.footnote).foregroundStyle(.secondary)
             }
+            Text(lyricsSourceLabel(sheet.lyricsSource))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 10)
     }
