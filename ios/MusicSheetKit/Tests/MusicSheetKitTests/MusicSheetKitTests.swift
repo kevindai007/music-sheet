@@ -206,9 +206,9 @@ import Testing
         #expect(items.contains(.init(name: "redirect_uri", value: google.redirectURI)))
     }
 
-    @Test func pkceChallengeMatchesRFC7636() {
-        #expect(GoogleOAuth.codeChallenge(for: "dBjftJeZ4CVP-mJ92K9qkt0Ei4RsS4y3_SrGq-LQ_9s")
-            == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+    @Test func pkceChallengeIsUnpaddedBase64URLSHA256() {
+        // SHA-256("abc") = ba7816bf…15ad, which base64url-encodes with both "-" and "_".
+        #expect(GoogleOAuth.codeChallenge(for: "abc") == "ungWv48Bz-pBQUDeXa4iI7ADYaOWF3qctBD_YfIAFa0")
         let token = GoogleOAuth.randomToken()
         #expect(token.count == 43 && !token.contains("=") && token != GoogleOAuth.randomToken())
     }
