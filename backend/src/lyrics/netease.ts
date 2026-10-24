@@ -18,8 +18,11 @@ interface NeteaseSong {
 
 export async function fetchFromNetease(title: string, artist?: string): Promise<Lyrics | null> {
   const query = artist ? `${title} ${artist}` : title;
-  const searchRes = await fetch(`${BASE}/search/get/web?${new URLSearchParams({ s: query, type: "1", limit: "5" })}`, {
+  // The GET variant (/search/get/web) now answers with an encrypted string; the POST form still returns JSON.
+  const searchRes = await fetch(`${BASE}/search/get`, {
+    method: "POST",
     headers: HEADERS,
+    body: new URLSearchParams({ s: query, type: "1", limit: "5" }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!searchRes.ok) throw new Error(`NetEase search failed: HTTP ${searchRes.status}`);
