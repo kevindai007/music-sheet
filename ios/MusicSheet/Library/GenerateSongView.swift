@@ -5,6 +5,7 @@ struct GenerateSongView: View {
     var onGenerated: (SongSheet) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AuthStore.self) private var auth
     @State private var title = ""
     @State private var artist = ""
     @State private var isWorking = false
@@ -56,7 +57,7 @@ struct GenerateSongView: View {
         task = Task {
             defer { isWorking = false }
             do {
-                let client = try AppSettings.makeClient()
+                let client = try auth.makeClient()
                 let sheet = try await client.generateSong(
                     title: title.trimmingCharacters(in: .whitespaces),
                     artist: artist.trimmingCharacters(in: .whitespaces)
@@ -68,6 +69,7 @@ struct GenerateSongView: View {
             } catch let error as URLError where error.code == .cancelled {
                 // The user cancelled.
             } catch {
+                auth.handle(error)
                 errorMessage = error.localizedDescription
             }
         }

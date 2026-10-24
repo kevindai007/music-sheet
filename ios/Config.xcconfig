@@ -1,0 +1,20 @@
+// Build settings shared by every configuration. Values reach the app through MusicSheet-Info.plist.
+
+// Google sign-in: the iOS OAuth client id from Google Cloud Console (not a secret). Empty hides the button.
+MUSIC_SHEET_GOOGLE_CLIENT_ID = 142866032940-7gtgiemg8m8voa8icsmuc4qk0aqq83td.apps.googleusercontent.com
+
+// Sign in with Apple needs a paid Apple Developer Program membership. Set to YES once you have one;
+// with a free account the capability would stop the app from signing.
+MUSIC_SHEET_APPLE_SIGNIN = NO
+MUSIC_SHEET_ENTITLEMENTS_YES = MusicSheet.entitlements
+MUSIC_SHEET_ENTITLEMENTS_NO =
+CODE_SIGN_ENTITLEMENTS = $(MUSIC_SHEET_ENTITLEMENTS_$(MUSIC_SHEET_APPLE_SIGNIN))
+
+// Developer token (the server's APP_TOKEN), which skips sign-in and has no daily limit.
+// It comes from Secrets.xcconfig (git-ignored, written by ./setup.sh) and is left out of Release builds,
+// so an App Store build never carries it.
+MUSIC_SHEET_APP_TOKEN =
+
+#include? "Secrets.xcconfig"
+
+MUSIC_SHEET_APP_TOKEN[config=Release] =

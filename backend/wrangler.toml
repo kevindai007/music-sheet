@@ -6,7 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 # Secrets (set with `npx wrangler secret put <NAME>`, never commit them):
 #   ANTHROPIC_API_KEY - Claude API key       } set at least one
 #   OPENAI_API_KEY    - OpenAI API key       }
-#   APP_TOKEN         - shared token the iPhone app sends in the X-App-Token header
+#   APP_TOKEN         - developer token sent in the X-App-Token header (no daily limit)
+#   SESSION_SECRET    - signs the session tokens issued after Apple/Google sign-in
 
 [vars]
 # Which AI to use when a request doesn't name one ("anthropic" or "openai").
@@ -15,3 +16,7 @@ AI_PROVIDER = ""
 # Model overrides; empty means the built-in default (claude-opus-5-5 / gpt-5.5).
 ANTHROPIC_MODEL = ""
 OPENAI_MODEL = ""
+# Google iOS OAuth client ids (comma-separated); empty disables Google sign-in.
+GOOGLE_CLIENT_IDS = "142866032940-7gtgiemg8m8voa8icsmuc4qk0aqq83td.apps.googleusercontent.com"
+# AI calls per signed-in user per UTC day. Note: on Workers the count lives in memory only.
+DAILY_LIMIT = "20"

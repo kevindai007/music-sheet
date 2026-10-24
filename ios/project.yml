@@ -16,6 +16,9 @@ targets:
       - path: MusicSheet
     dependencies:
       - package: MusicSheetKit
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kevindai.musicsheet

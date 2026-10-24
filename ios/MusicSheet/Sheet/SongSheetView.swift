@@ -84,7 +84,7 @@ struct SongSheetView: View {
             }
         }
         .sheet(isPresented: $showingRearrange) {
-            RearrangeView(sheet: sheet) { onOpen(SavedSong(sheet: $0)) }
+            SignInGate { RearrangeView(sheet: sheet) { onOpen(SavedSong(sheet: $0)) } }
         }
         .onDisappear { clock.pause() }
     }

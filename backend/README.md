@@ -23,9 +23,25 @@
 
 如果 Claude 的安全分类器拒绝了请求，会自动由官方推荐的备用模型重试（`fallbacks: "default"`）。
 
+## 登录与用量
+
+App 用 Apple 或 Google 登录，后端只负责验证：
+
+1. App 拿到 Apple/Google 签发的身份令牌（JWT），调用 `POST /auth/signin`，请求体为 `{"provider": "apple" | "google", "idToken": "..."}`。
+2. 后端用 Apple/Google 公开的公钥验证签名、签发方和受众（Apple 是 bundle id `APPLE_BUNDLE_ID`，Google 是 `GOOGLE_CLIENT_IDS` 里的客户端 ID），然后返回自己签发的会话令牌 `{sessionToken, expiresAt, user}`，有效期 30 天，用 `SESSION_SECRET` 签名。
+3. 之后的请求带上 `Authorization: Bearer <sessionToken>`。
+
+每个登录用户每天（UTC）最多调用 `DAILY_LIMIT` 次 AI（默认 20 次）。只有成功的生成和改编才计数，用完后返回 `429 quota_exceeded`。计数保存在 `USAGE_FILE` 里，Docker 镜像默认放在 `/data` 卷。
+
+`X-App-Token: <APP_TOKEN>` 是开发者通道，不受次数限制，供本地调试和 Debug 版 App 使用。
+
+其他接口：
+- `GET /auth/me`：当前用户和今日用量。
+- `DELETE /auth/account`：删除账号。服务器上只保存了用量计数，删除后一并清掉。
+
 ## 接口
 
-`POST /songs/generate`，请求头需带 `X-App-Token`。
+`POST /songs/generate`，需要登录（见上）。
 
 ```json
 { "title": "晴天", "artist": "周杰伦", "provider": "openai" }
@@ -64,7 +80,7 @@
 
 ### 错误码
 
-`401` token 不对，`400` 参数错误或指定的 provider 没配 key，`404` 找不到歌词，`429` AI 限流，`500` 一个 AI key 都没配，`502` AI 调用失败（返回体里的 `code` 说明原因：`declined` / `incomplete` / `invalid_output` / `upstream`）。
+`401` 未登录、登录过期或 token 不对，`400` 参数错误或指定的 provider 没配 key，`404` 找不到歌词，`429` AI 限流，`500` 一个 AI key 都没配，`502` AI 调用失败（返回体里的 `code` 说明原因：`declined` / `incomplete` / `invalid_output` / `upstream`）。
 
 ## 本地运行
 
@@ -106,7 +122,10 @@ npm run typecheck
 | 名称 | 类型 | 说明 |
 |---|---|---|
 | `PROD_HOST` / `PROD_USER` / `PROD_SSH_KEY` | Secret | 和 story-teller 仓库里的一样 |
-| `APP_TOKEN` | Secret | App 里填的 token |
+| `APP_TOKEN` | Secret | 开发者通道的 token，Debug 版 App 内置 |
+| `SESSION_SECRET` | Secret | 可选。不填时由服务器在第一次部署时生成，保存在 `~/music-sheet-session.secret` |
+| `GOOGLE_CLIENT_IDS` | Variable | Google iOS 客户端 ID，多个用逗号分隔；不填则关闭 Google 登录 |
+| `DAILY_LIMIT` | Variable | 可选，每人每天的 AI 次数，默认 20 |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Secret | 至少一个 |
 | `AI_PROVIDER` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | Variable | 可选 |
 
@@ -123,5 +142,6 @@ docker run --rm -p 8080:8080 --env-file backend/.dev.vars music-sheet-api
 npx wrangler login
 npx wrangler secret put ANTHROPIC_API_KEY   # 和/或 OPENAI_API_KEY
 npx wrangler secret put APP_TOKEN
+npx wrangler secret put SESSION_SECRET
 npm run deploy
 ```

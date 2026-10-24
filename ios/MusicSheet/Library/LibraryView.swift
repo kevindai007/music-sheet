@@ -62,7 +62,7 @@ struct LibraryView: View {
                 }
             }
             .sheet(isPresented: $showingGenerate) {
-                GenerateSongView { open(SavedSong(sheet: $0)) }
+                SignInGate { GenerateSongView { open(SavedSong(sheet: $0)) } }
             }
             .sheet(isPresented: $showingSettings) { SettingsView() }
         }
