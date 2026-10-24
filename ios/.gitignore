@@ -4,3 +4,4 @@ DerivedData/
 xcuserdata/
 .swiftpm/
 Secrets.xcconfig
+Local.xcconfig

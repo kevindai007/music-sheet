@@ -17,4 +17,7 @@ MUSIC_SHEET_APP_TOKEN =
 
 #include? "Secrets.xcconfig"
 
+// Signing team, remembered by ./setup.sh (git-ignored).
+#include? "Local.xcconfig"
+
 MUSIC_SHEET_APP_TOKEN[config=Release] =
