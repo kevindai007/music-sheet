@@ -31,7 +31,7 @@ open MusicSheet.xcodeproj
 打开 App → 左上角设置：
 
 - **模拟器**：后端用 `npm run dev` 启动，地址填 `http://localhost:8787`。
-- **你的服务器**：部署后填 `http://服务器地址:8080`（见下方 HTTPS 说明）。
+- **你的服务器**（默认）：`https://app.kevinonline.org`，nginx 反向代理到服务器上的 8080 端口。
 - **真机**：后端用 `npm run dev:lan` 启动，地址填 Mac 的局域网 IP，例如 `http://192.168.1.10:8787`（在"系统设置 → Wi-Fi → 详细信息"里查看）。第一次请求时 iPhone 会询问是否允许访问本地网络，选允许。也可以把后端部署到 Cloudflare，直接填 Worker 的 https 地址。
 - **App Token**：和后端 `.dev.vars` 里的 `APP_TOKEN` 一致。
 

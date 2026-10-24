@@ -19,7 +19,7 @@ struct SettingsView: View {
                 } header: {
                     Text("后端")
                 } footer: {
-                    Text("模拟器里可以用 http://localhost:8787。真机请填 Mac 的局域网地址（如 http://192.168.1.10:8787，后端用 npm run dev:lan 启动），或部署后的 Worker 地址。App Token 要和后端的 APP_TOKEN 一致。")
+                    Text("默认连接部署在服务器上的 https://app.kevinonline.org。本地调试时，模拟器填 http://localhost:8787，真机填 Mac 的局域网地址（如 http://192.168.1.10:8787，后端用 npm run dev:lan 启动）。App Token 要和后端的 APP_TOKEN 一致。")
                 }
             }
             .navigationTitle("设置")

@@ -80,8 +80,9 @@ jobs:
             if [ -n "$old" ]; then docker rm -f $old; fi
             docker rm -f music-sheet-api 2>/dev/null || true
 
+            # nginx (app.kevinonline.org) proxies to 127.0.0.1:8080, so the port is only bound locally.
             docker run -d --name music-sheet-api --restart unless-stopped \
-              -p 8080:8080 --env-file ~/music-sheet-api.env "$IMAGE"
+              -p 127.0.0.1:8080:8080 --env-file ~/music-sheet-api.env "$IMAGE"
             docker image prune -f
 
             for i in $(seq 1 10); do

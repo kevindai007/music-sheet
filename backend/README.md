@@ -95,7 +95,9 @@ npm run typecheck
 推送到 `main` 后，`.github/workflows/deploy.yml` 会：
 
 1. 构建镜像并推送到 `ghcr.io/kevindai007/music-sheet/music-sheet-api`；
-2. 通过 SSH 登录服务器，写入 `~/music-sheet-api.env`，删除旧的 story-teller 容器和上一版 music-sheet-api 容器，启动新容器（`--restart unless-stopped`，端口 8080），并检查 `/health`。
+2. 通过 SSH 登录服务器，写入 `~/music-sheet-api.env`，删除旧的 story-teller 容器和上一版 music-sheet-api 容器，启动新容器（`--restart unless-stopped`，只绑定 `127.0.0.1:8080`，由 nginx 的 `app.kevinonline.org` 对外提供 HTTPS），并检查 `/health`。
+
+生成曲谱可能要一分钟左右，nginx 默认 60 秒超时，需要在 `app.kevinonline.org` 的 `location` 里加上 `proxy_read_timeout 180s;`。
 
 也可以在 GitHub 的 Actions 页面手动运行 "Deploy backend"。
 

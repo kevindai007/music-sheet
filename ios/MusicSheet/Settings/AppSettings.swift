@@ -5,8 +5,8 @@ import Security
 /// Where the backend lives. The URL is a plain preference; the token is kept in the Keychain.
 enum AppSettings {
     static let backendURLKey = "backendURL"
-    /// Works in the iOS Simulator with `npm run dev`. On a real iPhone use your Mac's LAN address or the deployed Worker URL.
-    static let defaultBackendURL = "http://localhost:8787"
+    /// The deployed backend. For local development use `http://localhost:8787` (Simulator) or your Mac's LAN address.
+    static let defaultBackendURL = "https://app.kevinonline.org"
 
     static var backendURL: String {
         UserDefaults.standard.string(forKey: backendURLKey) ?? defaultBackendURL
