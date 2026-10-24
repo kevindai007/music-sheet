@@ -33,5 +33,19 @@ if [ -n "$token" ]; then
   echo "已写入 Secrets.xcconfig（不会提交到 git）。"
 fi
 
+# xcodegen regenerates the project and drops the Team picked in Xcode, so remember it in Local.xcconfig.
+if ! grep -qs '^DEVELOPMENT_TEAM' Local.xcconfig; then
+  # The team id is the OU of the "Apple Development" certificate Xcode created for your Apple ID.
+  team=$(security find-certificate -a -c "Apple Development" -p 2>/dev/null \
+    | openssl x509 -noout -subject 2>/dev/null \
+    | sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p' | head -1 || true)
+  if [ -n "$team" ]; then
+    printf 'DEVELOPMENT_TEAM = %s\n' "$team" >> Local.xcconfig
+    echo "已记住签名 Team：$team（Local.xcconfig，不会提交到 git）。"
+  else
+    echo "没找到开发证书：在 Xcode 里选中 MusicSheet target → Signing & Capabilities → Team 选你的 Apple ID，运行一次后再执行 ./setup.sh，以后就不用再选了。"
+  fi
+fi
+
 xcodegen
 open MusicSheet.xcodeproj
