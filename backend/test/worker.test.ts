@@ -226,6 +226,26 @@ describe("lyrics provider failures", () => {
     );
     expect((await generate({ title: "x" })).status).toBe(404);
   });
+
+  it("asks LRCLIB again when it is briefly overloaded instead of falling back to NetEase", async () => {
+    let lrclibCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        if (url.host === "lrclib.net") {
+          lrclibCalls++;
+          return lrclibCalls === 1 ? Response.json({ name: "ServerOverloaded" }, { status: 503 }) : Response.json([lrclibTrack]);
+        }
+        if (url.host === "api.anthropic.com") return Response.json(claudeMessage(annotation));
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+    const res = await generate({ title: "测试歌" });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as any).lyricsSource.provider).toBe("lrclib");
+    expect(lrclibCalls).toBe(2);
+  });
 });
 
 describe("AI provider selection", () => {
