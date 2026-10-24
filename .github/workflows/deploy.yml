@@ -59,7 +59,8 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: IMAGE,GHCR_USER,GHCR_TOKEN,APP_TOKEN,ANTHROPIC_API_KEY,OPENAI_API_KEY,AI_PROVIDER,ANTHROPIC_MODEL,OPENAI_MODEL
           # Keep every command on one line: no heredocs, line continuations or multi-line loops,
-          # which hung the first deploy run inside the SSH action.
+          # which can hang inside the SSH action. Removing the old story-teller container has hung
+          # on this server, so it is bounded and non-fatal.
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -68,8 +69,8 @@ jobs:
             umask 077
             printf '%s\n' "APP_TOKEN=$APP_TOKEN" "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" "OPENAI_API_KEY=$OPENAI_API_KEY" "AI_PROVIDER=$AI_PROVIDER" "ANTHROPIC_MODEL=$ANTHROPIC_MODEL" "OPENAI_MODEL=$OPENAI_MODEL" > ~/music-sheet-api.env
             old=$( (docker ps -aq --filter ancestor=ghcr.io/kevindai007/story-teller/story-teller:latest; docker ps -aq --filter name=story-teller) | sort -u )
-            if [ -n "$old" ]; then docker rm -f $old; fi
-            docker rm -f music-sheet-api 2>/dev/null || true
+            if [ -n "$old" ]; then timeout 60 docker rm -f $old || echo "warning: could not remove story-teller container(s) $old, continuing"; fi
+            timeout 60 docker rm -f music-sheet-api 2>/dev/null || true
             docker run -d --name music-sheet-api --restart unless-stopped -p 127.0.0.1:8080:8080 --env-file ~/music-sheet-api.env "$IMAGE"
             docker image prune -f
             for i in $(seq 1 15); do sleep 2; if docker exec music-sheet-api wget -qO- http://127.0.0.1:8080/health; then echo; echo "music-sheet-api is healthy"; exit 0; fi; done
