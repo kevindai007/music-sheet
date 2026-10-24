@@ -9,7 +9,7 @@ import {
   type ChordProvider,
 } from "./chords";
 import { annotatePrompt, rearrangePrompt } from "./chords/prompt";
-import { fetchLyrics } from "./lyrics";
+import { fetchLyrics, LyricsUnavailableError } from "./lyrics";
 import { buildSheet, sectionStarts, sheetLyrics } from "./sheet";
 import { SongSheetInputSchema } from "./types";
 import { DEFAULT_DAILY_LIMIT, MemoryUsageStore, today, type UsageStore } from "./usage";
@@ -129,7 +129,10 @@ async function generate(ctx: Context) {
   const { request, env } = ctx;
   const { title, artist, provider: requested } = await parseBody(request, GenerateRequest);
   const provider = pickProvider(env, requested);
-  const lyrics = await fetchLyrics(title, artist);
+  const lyrics = await fetchLyrics(title, artist).catch((err) => {
+    if (!(err instanceof LyricsUnavailableError)) throw err;
+    throw new HttpError(502, { error: "lyrics_unavailable", message: "歌词服务暂时连不上，请稍后再试。", detail: err.failures });
+  });
   if (!lyrics) throw new HttpError(404, { error: "lyrics_not_found", message: `没有找到《${title}》的歌词` });
 
   const annotation = await metered(ctx, () => provider.generate(annotatePrompt(lyrics)));

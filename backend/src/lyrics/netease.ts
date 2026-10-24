@@ -3,6 +3,8 @@ import { parseLrc } from "./lrc";
 
 // NetEase Cloud Music's public web endpoints. They are undocumented, so this is
 // only a fallback for Chinese songs that LRCLIB does not have.
+// A slow provider should fall through to the next one, not eat the whole request.
+const TIMEOUT_MS = 15_000;
 const BASE = "https://music.163.com/api";
 const HEADERS = { Referer: "https://music.163.com/", "User-Agent": "Mozilla/5.0" };
 
@@ -18,6 +20,7 @@ export async function fetchFromNetease(title: string, artist?: string): Promise<
   const query = artist ? `${title} ${artist}` : title;
   const searchRes = await fetch(`${BASE}/search/get/web?${new URLSearchParams({ s: query, type: "1", limit: "5" })}`, {
     headers: HEADERS,
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!searchRes.ok) throw new Error(`NetEase search failed: HTTP ${searchRes.status}`);
   const search = (await searchRes.json()) as { result?: { songs?: NeteaseSong[] } };
@@ -27,6 +30,7 @@ export async function fetchFromNetease(title: string, artist?: string): Promise<
 
   const lyricRes = await fetch(`${BASE}/song/lyric?${new URLSearchParams({ id: String(song.id), lv: "1" })}`, {
     headers: HEADERS,
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!lyricRes.ok) throw new Error(`NetEase lyric fetch failed: HTTP ${lyricRes.status}`);
   const lyric = (await lyricRes.json()) as { lrc?: { lyric?: string } };
