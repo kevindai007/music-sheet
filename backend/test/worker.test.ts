@@ -171,6 +171,61 @@ describe("POST /songs/generate", () => {
     expect(res.status).toBe(404);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
   });
+
+  it("searches NetEase with a POST form and uses its lyrics", async () => {
+    let search: Request | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        if (url.host === "lrclib.net") return Response.json([]);
+        if (url.pathname === "/api/search/get") {
+          search = new Request(url, init);
+          return Response.json({
+            result: { songs: [{ id: 7, name: "晴天", artists: [{ name: "周杰伦" }], album: { name: "叶惠美" }, duration: 269000 }] },
+          });
+        }
+        if (url.pathname === "/api/song/lyric") return Response.json({ lrc: { lyric: "[00:01.00]第一句\n[00:05.00]第二句" } });
+        if (url.host === "api.anthropic.com") return Response.json(claudeMessage(annotation));
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+    const res = await generate({ title: "晴天", artist: "周杰伦" });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as any).lyricsSource).toEqual({ provider: "netease", synced: true });
+    expect(search?.method).toBe("POST");
+    expect(new URLSearchParams(await search!.text()).get("s")).toBe("晴天 周杰伦");
+  });
+});
+
+describe("lyrics provider failures", () => {
+  it("reports 502 lyrics_unavailable, not 404, when every provider errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        if (url.host === "lrclib.net") throw new TypeError("fetch failed");
+        return new Response("blocked", { status: 403 });
+      }),
+    );
+    const res = await generate({ title: "晴天" });
+    expect(res.status).toBe(502);
+    const body: any = await res.json();
+    expect(body.error).toBe("lyrics_unavailable");
+    expect(body.detail).toHaveLength(2);
+  });
+
+  it("still says not found when one provider answered and the other failed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(input instanceof Request ? input.url : String(input));
+        if (url.host === "lrclib.net") return Response.json([]);
+        throw new TypeError("fetch failed");
+      }),
+    );
+    expect((await generate({ title: "x" })).status).toBe(404);
+  });
 });
 
 describe("AI provider selection", () => {

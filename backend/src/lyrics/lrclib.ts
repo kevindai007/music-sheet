@@ -1,6 +1,8 @@
 import type { Lyrics } from "../types";
 import { parseLrc, parsePlain } from "./lrc";
 
+// A slow provider should fall through to the next one, not eat the whole request.
+const TIMEOUT_MS = 15_000;
 const BASE = "https://lrclib.net/api";
 const USER_AGENT = "music-sheet (https://github.com/kevindai007/music-sheet)";
 
@@ -18,7 +20,7 @@ interface LrclibTrack {
 export async function fetchFromLrclib(title: string, artist?: string): Promise<Lyrics | null> {
   const params = new URLSearchParams({ track_name: title });
   if (artist) params.set("artist_name", artist);
-  const res = await fetch(`${BASE}/search?${params}`, { headers: { "User-Agent": USER_AGENT } });
+  const res = await fetch(`${BASE}/search?${params}`, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`LRCLIB search failed: HTTP ${res.status}`);
   const tracks = (await res.json()) as LrclibTrack[];
 
