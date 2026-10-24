@@ -4,5 +4,14 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Secrets (set with `npx wrangler secret put <NAME>`, never commit them):
-#   ANTHROPIC_API_KEY - Claude API key
+#   ANTHROPIC_API_KEY - Claude API key       } set at least one
+#   OPENAI_API_KEY    - OpenAI API key       }
 #   APP_TOKEN         - shared token the iPhone app sends in the X-App-Token header
+
+[vars]
+# Which AI to use when a request doesn't name one ("anthropic" or "openai").
+# Leave empty to use the first provider that has a key, Anthropic first.
+AI_PROVIDER = ""
+# Model overrides; empty means the built-in default (claude-opus-5-5 / gpt-5.5).
+ANTHROPIC_MODEL = ""
+OPENAI_MODEL = ""
