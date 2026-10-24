@@ -1,7 +1,7 @@
 // Build settings shared by every configuration. Values reach the app through MusicSheet-Info.plist.
 
 // Google sign-in: the iOS OAuth client id from Google Cloud Console (not a secret). Empty hides the button.
-MUSIC_SHEET_GOOGLE_CLIENT_ID =
+MUSIC_SHEET_GOOGLE_CLIENT_ID = 142866032940-7gtgiemg8m8voa8icsmuc4qk0aqq83td.apps.googleusercontent.com
 
 // Sign in with Apple needs a paid Apple Developer Program membership. Set to YES once you have one;
 // with a free account the capability would stop the app from signing.

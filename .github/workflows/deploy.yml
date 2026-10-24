@@ -54,7 +54,7 @@ jobs:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           # Optional. When empty, the server generates one on first deploy and keeps it in ~/music-sheet-session.secret.
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS }}
+          GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS || '142866032940-7gtgiemg8m8voa8icsmuc4qk0aqq83td.apps.googleusercontent.com' }}
           DAILY_LIMIT: ${{ vars.DAILY_LIMIT }}
         with:
           command_timeout: 5m

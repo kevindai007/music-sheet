@@ -17,6 +17,6 @@ AI_PROVIDER = ""
 ANTHROPIC_MODEL = ""
 OPENAI_MODEL = ""
 # Google iOS OAuth client ids (comma-separated); empty disables Google sign-in.
-GOOGLE_CLIENT_IDS = ""
+GOOGLE_CLIENT_IDS = "142866032940-7gtgiemg8m8voa8icsmuc4qk0aqq83td.apps.googleusercontent.com"
 # AI calls per signed-in user per UTC day. Note: on Workers the count lives in memory only.
 DAILY_LIMIT = "20"

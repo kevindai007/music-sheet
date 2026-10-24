@@ -37,7 +37,7 @@ AI 生成和改编需要登录，已保存的曲谱不登录也能看。每人�
 
 登录方式在 `Config.xcconfig` 里开启：
 
-- **Google**：在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建一个 "iOS" 类型的 OAuth 客户端，Bundle ID 填 `com.kevindai.musicsheet`。把得到的客户端 ID（形如 `123-abc.apps.googleusercontent.com`）填到 `MUSIC_SHEET_GOOGLE_CLIENT_ID`，同时填到 GitHub 仓库 Environment `oracle-node1` 的变量 `GOOGLE_CLIENT_IDS`，然后重新部署后端。App 不需要 Google SDK，用的是系统自带的网页登录（PKCE）。
+- **Google**：在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建一个 "iOS" 类型的 OAuth 客户端，Bundle ID 填 `com.kevindai.musicsheet`。客户端 ID 已经填在 `MUSIC_SHEET_GOOGLE_CLIENT_ID` 和 `deploy.yml` 的 `GOOGLE_CLIENT_IDS` 默认值里；换客户端时两处一起改（或者在 Environment `oracle-node1` 里设置变量 `GOOGLE_CLIENT_IDS` 覆盖服务器端）。App 不需要 Google SDK，用的是系统自带的网页登录（PKCE）。
 - **Apple**：需要付费的 Apple Developer Program（每年 99 美元）。加入后把 `MUSIC_SHEET_APPLE_SIGNIN` 改成 `YES`，重新执行 `xcodegen`，Xcode 会自动给 App ID 开启 Sign in with Apple。后端不用改。上架时如果提供了 Google 登录，就必须同时提供 Apple 登录。
 
 ## 连接后端
