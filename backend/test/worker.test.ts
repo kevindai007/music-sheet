@@ -45,6 +45,54 @@ function generate(body: unknown, token = "secret") {
   );
 }
 
+function openAIResponse(body: unknown, overrides: Record<string, unknown> = {}) {
+  return {
+    id: "resp_1",
+    object: "response",
+    created_at: 0,
+    status: "completed",
+    model: "gpt-5.5",
+    output: [
+      {
+        type: "message",
+        id: "msg_1",
+        status: "completed",
+        role: "assistant",
+        content: [{ type: "output_text", text: JSON.stringify(body), annotations: [] }],
+      },
+    ],
+    incomplete_details: null,
+    usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+    ...overrides,
+  };
+}
+
+const lrclibTrack = {
+  trackName: "测试歌",
+  artistName: "某歌手",
+  albumName: null,
+  duration: 200,
+  instrumental: false,
+  plainLyrics: "第一句\n第二句",
+  syncedLyrics: "[00:10.00]第一句\n[00:15.00]第二句",
+};
+
+/** Stubs fetch: LRCLIB returns the fixture; AI hosts are answered by `ai`. Records which AI hosts were called. */
+function stubNetwork(ai: (host: string, req: Request) => Promise<Response>) {
+  const aiHosts: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const { host } = new URL(req.url);
+      if (host === "lrclib.net") return Response.json([lrclibTrack]);
+      aiHosts.push(host);
+      return ai(host, req);
+    }),
+  );
+  return aiHosts;
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("POST /songs/generate", () => {
@@ -122,5 +170,110 @@ describe("POST /songs/generate", () => {
     const res = await generate({ title: "不存在的歌" });
     expect(res.status).toBe(404);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("AI provider selection", () => {
+  const both: Env = { ...env, OPENAI_API_KEY: "sk-openai-test" };
+  const answer = async (host: string) =>
+    host === "api.openai.com" ? Response.json(openAIResponse(annotation)) : Response.json(claudeMessage(annotation));
+
+  function generateWith(e: Env, body: unknown) {
+    return worker.fetch(
+      new Request("https://api.test/songs/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-App-Token": "secret" },
+        body: JSON.stringify(body),
+      }),
+      e,
+    );
+  }
+
+  it("uses OpenAI with the shared prompt and schema when only an OpenAI key is set", async () => {
+    let openAIRequest: any;
+    const hosts = stubNetwork(async (host, req) => {
+      openAIRequest = await req.json();
+      return answer(host);
+    });
+    const res = await generateWith({ APP_TOKEN: "secret", OPENAI_API_KEY: "sk-openai-test" }, { title: "测试歌" });
+    expect(res.status).toBe(200);
+    const sheet: any = await res.json();
+    expect(hosts).toEqual(["api.openai.com"]);
+    expect(sheet.generatedBy).toEqual({ provider: "openai", model: "gpt-5.5" });
+    expect(sheet.sections[0].lines[1].chords).toEqual([{ at: 2, chord: "G" }]);
+    expect(openAIRequest.input).toContain("0\t第一句\n1\t第二句");
+    expect(openAIRequest.text.format).toMatchObject({ type: "json_schema", name: "chord_annotation", strict: true });
+  });
+
+  it("prefers Anthropic when both keys are set, unless AI_PROVIDER or the request says otherwise", async () => {
+    let hosts = stubNetwork(answer);
+    await generateWith(both, { title: "x" });
+    expect(hosts).toEqual(["api.anthropic.com"]);
+
+    hosts = stubNetwork(answer);
+    await generateWith({ ...both, AI_PROVIDER: "openai" }, { title: "x" });
+    expect(hosts).toEqual(["api.openai.com"]);
+
+    hosts = stubNetwork(answer);
+    const res = await generateWith(both, { title: "x", provider: "openai" });
+    expect(hosts).toEqual(["api.openai.com"]);
+    expect(((await res.json()) as any).generatedBy.provider).toBe("openai");
+  });
+
+  it("honours a custom model", async () => {
+    let model = "";
+    stubNetwork(async (host, req) => {
+      model = ((await req.json()) as any).model;
+      return answer(host);
+    });
+    await generateWith({ APP_TOKEN: "secret", OPENAI_API_KEY: "k", OPENAI_MODEL: "gpt-custom" }, { title: "x" });
+    expect(model).toBe("gpt-custom");
+  });
+
+  it("rejects a requested provider that has no key, and reports when none is configured", async () => {
+    stubNetwork(answer);
+    let res = await generateWith(env, { title: "x", provider: "openai" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as any).error).toBe("provider_unavailable");
+
+    res = await generateWith({ APP_TOKEN: "secret" }, { title: "x" });
+    expect(res.status).toBe(500);
+
+    res = await generateWith(env, { title: "x", provider: "gemini" });
+    expect(res.status).toBe(400);
+  });
+
+  it("maps an OpenAI refusal and a cut-off answer to provider-neutral errors", async () => {
+    const openAIOnly: Env = { APP_TOKEN: "secret", OPENAI_API_KEY: "k" };
+    stubNetwork(async () =>
+      Response.json(
+        openAIResponse(annotation, {
+          output: [
+            {
+              type: "message",
+              id: "msg_1",
+              status: "completed",
+              role: "assistant",
+              content: [{ type: "refusal", refusal: "no" }],
+            },
+          ],
+        }),
+      ),
+    );
+    let res = await generateWith(openAIOnly, { title: "x" });
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: "chords_failed", code: "declined", provider: "openai" });
+
+    stubNetwork(async () =>
+      Response.json(openAIResponse(annotation, { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } })),
+    );
+    res = await generateWith(openAIOnly, { title: "x" });
+    expect(await res.json()).toMatchObject({ code: "incomplete" });
+  });
+
+  it("maps rate limits from either provider to 429", async () => {
+    stubNetwork(async () => Response.json({ error: { message: "slow down" } }, { status: 429 }));
+    const res = await generateWith({ APP_TOKEN: "secret", OPENAI_API_KEY: "k" }, { title: "x" });
+    expect(res.status).toBe(429);
   });
 });
