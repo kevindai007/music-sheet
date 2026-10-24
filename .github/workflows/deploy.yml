@@ -52,12 +52,16 @@ jobs:
           AI_PROVIDER: ${{ vars.AI_PROVIDER }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          # Optional. When empty, the server generates one on first deploy and keeps it in ~/music-sheet-session.secret.
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_CLIENT_IDS: ${{ vars.GOOGLE_CLIENT_IDS }}
+          DAILY_LIMIT: ${{ vars.DAILY_LIMIT }}
         with:
           command_timeout: 5m
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN,APP_TOKEN,ANTHROPIC_API_KEY,OPENAI_API_KEY,AI_PROVIDER,ANTHROPIC_MODEL,OPENAI_MODEL
+          envs: IMAGE,GHCR_USER,GHCR_TOKEN,APP_TOKEN,ANTHROPIC_API_KEY,OPENAI_API_KEY,AI_PROVIDER,ANTHROPIC_MODEL,OPENAI_MODEL,SESSION_SECRET,GOOGLE_CLIENT_IDS,DAILY_LIMIT
           # Keep every command on one line: no heredocs, line continuations or multi-line loops,
           # which can hang inside the SSH action. Removing the old story-teller container has hung
           # on this server, so it is bounded and non-fatal.
@@ -67,11 +71,12 @@ jobs:
             docker pull "$IMAGE"
             docker logout ghcr.io
             umask 077
-            printf '%s\n' "APP_TOKEN=$APP_TOKEN" "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" "OPENAI_API_KEY=$OPENAI_API_KEY" "AI_PROVIDER=$AI_PROVIDER" "ANTHROPIC_MODEL=$ANTHROPIC_MODEL" "OPENAI_MODEL=$OPENAI_MODEL" > ~/music-sheet-api.env
+            if [ -z "$SESSION_SECRET" ]; then [ -s ~/music-sheet-session.secret ] || openssl rand -hex 32 > ~/music-sheet-session.secret; SESSION_SECRET=$(cat ~/music-sheet-session.secret); fi
+            printf '%s\n' "APP_TOKEN=$APP_TOKEN" "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" "OPENAI_API_KEY=$OPENAI_API_KEY" "AI_PROVIDER=$AI_PROVIDER" "ANTHROPIC_MODEL=$ANTHROPIC_MODEL" "OPENAI_MODEL=$OPENAI_MODEL" "SESSION_SECRET=$SESSION_SECRET" "GOOGLE_CLIENT_IDS=$GOOGLE_CLIENT_IDS" "DAILY_LIMIT=$DAILY_LIMIT" > ~/music-sheet-api.env
             old=$( (docker ps -aq --filter ancestor=ghcr.io/kevindai007/story-teller/story-teller:latest; docker ps -aq --filter name=story-teller) | sort -u )
             if [ -n "$old" ]; then timeout 60 docker rm -f $old || echo "warning: could not remove story-teller container(s) $old, continuing"; fi
             timeout 60 docker rm -f music-sheet-api 2>/dev/null || true
-            docker run -d --name music-sheet-api --restart unless-stopped -p 127.0.0.1:8080:8080 --env-file ~/music-sheet-api.env "$IMAGE"
+            docker run -d --name music-sheet-api --restart unless-stopped -p 127.0.0.1:8080:8080 -v music-sheet-data:/data --env-file ~/music-sheet-api.env "$IMAGE"
             docker image prune -f
             for i in $(seq 1 15); do sleep 2; if docker exec music-sheet-api wget -qO- http://127.0.0.1:8080/health; then echo; echo "music-sheet-api is healthy"; exit 0; fi; done
             echo "music-sheet-api did not become healthy"; docker logs --tail 50 music-sheet-api; exit 1
