@@ -16,11 +16,16 @@ SwiftUI 写的练琴 App（iOS 17 以上）。现在还不连吉他。
 需要 Xcode 16 以上。
 
 ```bash
-brew install xcodegen
 cd ios
-xcodegen            # 生成 MusicSheet.xcodeproj（这个文件不提交到仓库）
-open MusicSheet.xcodeproj
+./setup.sh
 ```
+
+`setup.sh` 会做三件事：
+1. 没装 XcodeGen 的话先用 Homebrew 装上。
+2. 通过 ssh 从服务器读取 `APP_TOKEN`，写进 `ios/Secrets.xcconfig`。这个文件不提交到仓库，读不到时会让你粘贴。
+3. 生成并打开 `MusicSheet.xcodeproj`。这个文件也不提交。
+
+这样装到手机上的 App 已经内置了服务器地址和 Token，打开就能用，不用再填任何东西。以后只是改了代码、Token 没变的话，直接在 Xcode 里点运行，或者执行 `xcodegen` 就行。服务器上换了 Token 的话，删掉 `Secrets.xcconfig` 再运行一次 `./setup.sh`。
 
 1. 在 Xcode 里选中 MusicSheet target → Signing & Capabilities → Team 选你的 Apple ID（免费账号也可以）。
 2. 先选一个 iPhone 模拟器，点运行。
@@ -28,12 +33,11 @@ open MusicSheet.xcodeproj
 
 ## 连接后端
 
-打开 App → 左上角设置：
+默认连接 `https://app.kevinonline.org`，Token 在构建时就内置好了，不需要设置。只有本地调试时才需要打开 App → 左上角设置 → 调试设置：
 
 - **模拟器**：后端用 `npm run dev` 启动，地址填 `http://localhost:8787`。
-- **你的服务器**（默认）：`https://app.kevinonline.org`，nginx 反向代理到服务器上的 8080 端口。
 - **真机**：后端用 `npm run dev:lan` 启动，地址填 Mac 的局域网 IP，例如 `http://192.168.1.10:8787`（在"系统设置 → Wi-Fi → 详细信息"里查看）。第一次请求时 iPhone 会询问是否允许访问本地网络，选允许。也可以把后端部署到 Cloudflare，直接填 Worker 的 https 地址。
-- **App Token**：和后端 `.dev.vars` 里的 `APP_TOKEN` 一致。
+- **App Token**：留空就用内置的；连本地后端时填 `.dev.vars` 里的 `APP_TOKEN`。点"恢复默认"可以回到服务器。
 
 ### HTTPS 说明
 
@@ -43,4 +47,4 @@ iOS 默认只允许 App 用 HTTPS 访问公网地址，`http://` 只放行了本
 
 - `MusicSheetKit/`：不依赖 UI 的逻辑（曲谱模型、和弦解析与变调、级数、滚动时间轴、后端客户端），附单元测试：`swift test --package-path MusicSheetKit`。
 - `MusicSheet/`：SwiftUI 界面和 SwiftData 曲库。
-- `project.yml`：XcodeGen 配置。
+- `project.yml`：XcodeGen 配置。`Config.xcconfig` 会引入 `Secrets.xcconfig` 里的 Token。

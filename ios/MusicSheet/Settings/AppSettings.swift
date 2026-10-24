@@ -2,21 +2,36 @@ import Foundation
 import MusicSheetKit
 import Security
 
-/// Where the backend lives. The URL is a plain preference; the token is kept in the Keychain.
+/// Where the backend lives. Both the URL and the token work out of the box; Settings can override them for debugging.
+/// The URL override is a plain preference, the token override is kept in the Keychain.
 enum AppSettings {
     static let backendURLKey = "backendURL"
     /// The deployed backend. For local development use `http://localhost:8787` (Simulator) or your Mac's LAN address.
     static let defaultBackendURL = "https://app.kevinonline.org"
 
+    /// The override from Settings, or the deployed backend when there is none.
     static var backendURL: String {
-        UserDefaults.standard.string(forKey: backendURLKey) ?? defaultBackendURL
+        let override = UserDefaults.standard.string(forKey: backendURLKey)?.trimmingCharacters(in: .whitespaces) ?? ""
+        return override.isEmpty ? defaultBackendURL : override
+    }
+
+    /// The token baked in at build time from `Secrets.xcconfig` (see `ios/setup.sh`).
+    static var bundledToken: String? {
+        let token = Bundle.main.object(forInfoDictionaryKey: "MusicSheetAppToken") as? String
+        return token?.isEmpty == false ? token : nil
+    }
+
+    /// The token typed in Settings, or the bundled one.
+    static var appToken: String? {
+        if let token = Keychain.appToken, !token.isEmpty { return token }
+        return bundledToken
     }
 
     static func makeClient() throws -> APIClient {
         guard let url = URL(string: backendURL.trimmingCharacters(in: .whitespaces)), url.scheme != nil else {
             throw ConfigurationError.invalidURL
         }
-        guard let token = Keychain.appToken, !token.isEmpty else { throw ConfigurationError.missingToken }
+        guard let token = appToken else { throw ConfigurationError.missingToken }
         return APIClient(baseURL: url, token: token)
     }
 
@@ -26,7 +41,7 @@ enum AppSettings {
         var errorDescription: String? {
             switch self {
             case .invalidURL: "后端地址无效，请在设置里检查。"
-            case .missingToken: "还没有填写 App Token，请先到设置里填写。"
+            case .missingToken: "这个版本没有内置 App Token：在 Mac 上运行 ios/setup.sh 重新安装，或到设置里填写。"
             }
         }
     }

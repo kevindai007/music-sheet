@@ -1,0 +1,6 @@
+// Build settings shared by every configuration.
+// The App Token is baked into the app from Secrets.xcconfig (git-ignored, created by ./setup.sh),
+// so nobody has to type it on the phone. Without that file the token is empty and the app asks for it in Settings.
+MUSIC_SHEET_APP_TOKEN =
+
+#include? "Secrets.xcconfig"
