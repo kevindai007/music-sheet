@@ -1,4 +1,4 @@
-import type { ChordAnnotation, Lyrics, PlacedChord, SheetSection, SongSheet } from "./types";
+import type { ChordAnnotation, Lyrics, PlacedChord, SheetSection, SongSheet, SongSheetInput } from "./types";
 
 // Root, optional quality/extensions, optional slash bass: C, F#m7b5, Bbmaj7, Cadd9, G/B, Dsus4, E7(#9).
 const CHORD = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?[0-9]*(sus[24]?|add[0-9]+|maj[0-9]*|[#b+-][0-9]+|\([^)]*\))*(\/[A-G][#b]?)?$/;
@@ -7,8 +7,8 @@ export function isChordSymbol(s: string): boolean {
   return CHORD.test(s.trim());
 }
 
-/** Merges Claude's chord positions into the fetched lyrics. Bad positions are clamped or dropped. */
-export function buildSheet(lyrics: Lyrics, ann: ChordAnnotation): SongSheet {
+/** Merges the AI's chord positions into the fetched lyrics. Bad positions are clamped or dropped. */
+export function buildSheet(lyrics: Lyrics, ann: ChordAnnotation, arrangement: SongSheet["arrangement"] = null): SongSheet {
   const lineCount = lyrics.lines.length;
   const chordsByLine = new Map<number, PlacedChord[]>();
   for (const { line, at, chord } of ann.chords) {
@@ -54,6 +54,30 @@ export function buildSheet(lyrics: Lyrics, ann: ChordAnnotation): SongSheet {
     notes: ann.notes,
     introChords: ann.introChords.filter(isChordSymbol),
     lyricsSource: { provider: lyrics.provider, synced: lyrics.synced },
+    arrangement,
     sections,
   };
+}
+
+/** Flattens a sheet back to its lyric lines, so a rearrangement can reuse `buildSheet`. */
+export function sheetLyrics(sheet: SongSheetInput): Lyrics {
+  return {
+    provider: sheet.lyricsSource.provider,
+    title: sheet.title,
+    artist: sheet.artist,
+    album: sheet.album ?? null,
+    durationSec: sheet.durationSec ?? null,
+    synced: sheet.lyricsSource.synced,
+    lines: sheet.sections.flatMap((s) => s.lines.map((l) => ({ timeMs: l.timeMs ?? null, text: l.text }))),
+  };
+}
+
+/** Where each section of a sheet starts, as line numbers into its flattened lines. */
+export function sectionStarts(sheet: SongSheetInput): ChordAnnotation["sections"] {
+  let startLine = 0;
+  return sheet.sections.map((s) => {
+    const entry = { name: s.name, startLine };
+    startLine += s.lines.length;
+    return entry;
+  });
 }

@@ -8,7 +8,8 @@ export interface LyricLine {
 }
 
 export interface Lyrics {
-  provider: "lrclib" | "netease";
+  /** Where the lyrics came from, e.g. "lrclib" or "netease". */
+  provider: string;
   title: string;
   artist: string;
   album: string | null;
@@ -82,6 +83,47 @@ export interface SongSheet {
   confidence: "high" | "medium" | "low";
   notes: string;
   introChords: string[];
-  lyricsSource: { provider: Lyrics["provider"]; synced: boolean };
+  lyricsSource: { provider: string; synced: boolean };
+  /** Set on AI rearrangements; null for the original arrangement. */
+  arrangement: { style: string } | null;
   sections: SheetSection[];
 }
+
+const text = (max: number) => z.string().max(max);
+
+/** A sheet sent back by the app, e.g. to rearrange. Limits keep a bad client from sending huge prompts. */
+export const SongSheetInputSchema = z.object({
+  title: text(200),
+  artist: text(200),
+  album: text(200).nullable().optional(),
+  durationSec: z.number().int().nullable().optional(),
+  key: text(10),
+  capo: z.number().int().min(0).max(11),
+  bpm: z.number().int().min(20).max(300),
+  timeSignature: text(10),
+  strumming: text(100),
+  confidence: z.enum(["high", "medium", "low"]),
+  notes: text(2000),
+  introChords: z.array(text(20)).max(64),
+  lyricsSource: z.object({ provider: text(40), synced: z.boolean() }),
+  arrangement: z.object({ style: text(200) }).nullable().optional(),
+  sections: z
+    .array(
+      z.object({
+        name: text(40),
+        lines: z
+          .array(
+            z.object({
+              timeMs: z.number().int().nullable().optional(),
+              text: text(300),
+              chords: z.array(z.object({ at: z.number().int().min(0), chord: text(20) })).max(32),
+            }),
+          )
+          .max(300),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+
+export type SongSheetInput = z.infer<typeof SongSheetInputSchema>;

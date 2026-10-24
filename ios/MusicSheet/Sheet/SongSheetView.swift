@@ -4,12 +4,15 @@ import SwiftUI
 /// The practice screen: chords over lyrics, transposition and capo, and auto-scroll.
 struct SongSheetView: View {
     @Bindable var song: SavedSong
+    /// Saves and opens another song, such as a rearrangement of this one.
+    var onOpen: (SavedSong) -> Void = { _ in }
 
     @AppStorage("chordNotation") private var notation: ChordNotation = .letters
     @AppStorage("barsPerLine") private var barsPerLine = 2
     @State private var mode: PracticeTimeline.Mode = .synced
     @State private var clock = PracticeClock()
     @State private var editing: LineRef?
+    @State private var showingRearrange = false
 
     var body: some View {
         if let sheet = song.sheet {
@@ -80,12 +83,18 @@ struct SongSheetView: View {
                 song.update(updated)
             }
         }
+        .sheet(isPresented: $showingRearrange) {
+            RearrangeView(sheet: sheet) { onOpen(SavedSong(sheet: $0)) }
+        }
         .onDisappear { clock.pause() }
     }
 
     private func header(_ sheet: SongSheet, key: MusicalKey?, format: (String) -> String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(sheet.artist).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(sheet.artist).foregroundStyle(.secondary)
+                if let style = song.arrangementStyle { ArrangementBadge(style: style) }
+            }
             HStack(spacing: 12) {
                 let sounding = key?.transposed(by: song.transpose).name ?? sheet.key
                 Label("\(sounding) 调", systemImage: "music.note")
@@ -166,6 +175,14 @@ struct SongSheetView: View {
 
     @ToolbarContentBuilder
     private func displayMenu(_ sheet: SongSheet) -> some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                clock.pause()
+                showingRearrange = true
+            } label: {
+                Label("AI 改编", systemImage: "wand.and.stars")
+            }
+        }
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Picker("和弦显示", selection: $notation) {

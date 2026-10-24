@@ -52,7 +52,19 @@
 
 `at` 是行内第几个字（从 0 开始，按 Unicode 字符计）。`timeMs` 在歌词带时间轴时有值，App 可以据此和原曲同步滚动。
 
-错误码：`401` token 不对，`400` 参数错误或指定的 provider 没配 key，`404` 找不到歌词，`429` AI 限流，`500` 一个 AI key 都没配，`502` AI 调用失败（返回体里的 `code` 说明原因：`declined` / `incomplete` / `invalid_output` / `upstream`）。
+### `POST /songs/rearrange`
+
+把 App 里现有的曲谱（包括你手动改过的和弦）连同风格描述发给 AI，按新风格重新配和弦。歌词、时间轴和段落划分保持不变，只改和弦、节奏型，必要时会换调。
+
+```json
+{ "sheet": { "...": "完整的 SongSheet" }, "style": "爵士：多用七和弦和二五一", "provider": "openai" }
+```
+
+返回新的 `SongSheet`，其中 `arrangement` 为 `{ "style": "..." }`（原版曲谱的 `arrangement` 是 `null`）。
+
+### 错误码
+
+`401` token 不对，`400` 参数错误或指定的 provider 没配 key，`404` 找不到歌词，`429` AI 限流，`500` 一个 AI key 都没配，`502` AI 调用失败（返回体里的 `code` 说明原因：`declined` / `incomplete` / `invalid_output` / `upstream`）。
 
 ## 本地运行
 
@@ -76,7 +88,36 @@ npm test          # 单元测试（网络请求均为模拟）
 npm run typecheck
 ```
 
-## 部署
+## 部署到自己的服务器（Docker）
+
+`Dockerfile` 会把后端打包成一个 Node.js 服务（入口 `src/server.ts`），监听 8080 端口，配置全部来自环境变量（和上面的表格一样，另有可选的 `PORT`）。
+
+推送到 `main` 后，`.github/workflows/deploy.yml` 会：
+
+1. 构建镜像并推送到 `ghcr.io/kevindai007/music-sheet/music-sheet-api`；
+2. 通过 SSH 登录服务器，写入 `~/music-sheet-api.env`，删除旧的 story-teller 容器和上一版 music-sheet-api 容器，启动新容器（`--restart unless-stopped`，只绑定 `127.0.0.1:8080`，由 nginx 的 `app.kevinonline.org` 对外提供 HTTPS），并检查 `/health`。
+
+生成曲谱可能要一分钟左右，nginx 默认 60 秒超时，需要在 `app.kevinonline.org` 的 `location` 里加上 `proxy_read_timeout 180s;`。
+
+也可以在 GitHub 的 Actions 页面手动运行 "Deploy backend"。
+
+需要在仓库的 **Settings → Environments → `oracle-node1`** 里配置：
+
+| 名称 | 类型 | 说明 |
+|---|---|---|
+| `PROD_HOST` / `PROD_USER` / `PROD_SSH_KEY` | Secret | 和 story-teller 仓库里的一样 |
+| `APP_TOKEN` | Secret | App 里填的 token |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | Secret | 至少一个 |
+| `AI_PROVIDER` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | Variable | 可选 |
+
+本地试跑镜像：
+
+```bash
+docker build -t music-sheet-api backend
+docker run --rm -p 8080:8080 --env-file backend/.dev.vars music-sheet-api
+```
+
+## 部署到 Cloudflare Workers（可选）
 
 ```bash
 npx wrangler login

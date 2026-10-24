@@ -7,15 +7,20 @@
     "dev:lan": "wrangler dev --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "test": "vitest run",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/server.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",
+    "@hono/node-server": "^2.1.5",
     "openai": "^7.43.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261022.1",
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",
     "wrangler": "^4.151.3"

@@ -2,7 +2,7 @@ import { createAnthropicProvider } from "./anthropic";
 import { createOpenAIProvider } from "./openai";
 import { PROVIDER_NAMES, type ChordProvider, type ProviderName } from "./provider";
 
-export { ChordAnnotationError, PROVIDER_NAMES, type ChordProvider, type ProviderName } from "./provider";
+export { ChordAnnotationError, PROVIDER_NAMES, type ChordPrompt, type ChordProvider, type ProviderName } from "./provider";
 
 /** The AI settings the Worker reads from its environment. Only the keys you set are used. */
 export interface AIEnv {

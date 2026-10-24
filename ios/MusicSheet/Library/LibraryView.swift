@@ -34,7 +34,12 @@ struct LibraryView: View {
                         ForEach(filtered) { song in
                             NavigationLink(value: song) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(song.title).font(.headline)
+                                    HStack(spacing: 6) {
+                                        Text(song.title).font(.headline)
+                                        if let style = song.arrangementStyle {
+                                            ArrangementBadge(style: style)
+                                        }
+                                    }
                                     Text(song.artist).font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
@@ -47,7 +52,7 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("曲库")
-            .navigationDestination(for: SavedSong.self) { SongSheetView(song: $0) }
+            .navigationDestination(for: SavedSong.self) { SongSheetView(song: $0, onOpen: open) }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingSettings = true } label: { Label("设置", systemImage: "gearshape") }
@@ -63,8 +68,9 @@ struct LibraryView: View {
         }
     }
 
+    /// Saves a new song and shows it on top of whatever is open.
     private func open(_ song: SavedSong) {
         modelContext.insert(song)
-        path = [song]
+        path.append(song)
     }
 }

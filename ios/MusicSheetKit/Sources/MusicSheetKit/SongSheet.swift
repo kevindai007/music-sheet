@@ -16,7 +16,24 @@ public struct SongSheet: Codable, Hashable, Sendable {
     public var notes: String
     public var introChords: [String]
     public var lyricsSource: LyricsSource
+    /// Set on AI rearrangements; nil for the original arrangement.
+    public var arrangement: Arrangement?
+    /// Which AI produced the sheet, when the backend reports it.
+    public var generatedBy: GeneratedBy?
     public var sections: [Section]
+
+    public struct Arrangement: Codable, Hashable, Sendable {
+        public var style: String
+
+        public init(style: String) {
+            self.style = style
+        }
+    }
+
+    public struct GeneratedBy: Codable, Hashable, Sendable {
+        public var provider: String
+        public var model: String
+    }
 
     public enum Confidence: String, Codable, Sendable {
         case high, medium, low
@@ -70,7 +87,8 @@ public struct SongSheet: Codable, Hashable, Sendable {
         title: String, artist: String, album: String? = nil, durationSec: Int? = nil,
         key: String, capo: Int = 0, bpm: Int, timeSignature: String = "4/4",
         strumming: String = "", confidence: Confidence = .medium, notes: String = "",
-        introChords: [String] = [], lyricsSource: LyricsSource, sections: [Section]
+        introChords: [String] = [], lyricsSource: LyricsSource, arrangement: Arrangement? = nil,
+        sections: [Section]
     ) {
         self.title = title
         self.artist = artist
@@ -85,6 +103,7 @@ public struct SongSheet: Codable, Hashable, Sendable {
         self.notes = notes
         self.introChords = introChords
         self.lyricsSource = lyricsSource
+        self.arrangement = arrangement
         self.sections = sections
     }
 

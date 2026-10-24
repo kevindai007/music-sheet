@@ -277,3 +277,91 @@ describe("AI provider selection", () => {
     expect(res.status).toBe(429);
   });
 });
+
+describe("POST /songs/rearrange", () => {
+  const sheet = {
+    title: "测试歌",
+    artist: "某歌手",
+    album: null,
+    durationSec: 200,
+    key: "C",
+    capo: 0,
+    bpm: 80,
+    timeSignature: "4/4",
+    strumming: "D DU",
+    confidence: "high",
+    notes: "",
+    introChords: ["C"],
+    lyricsSource: { provider: "lrclib", synced: true },
+    arrangement: null,
+    sections: [
+      { name: "主歌", lines: [{ timeMs: 10_000, text: "第一句", chords: [{ at: 0, chord: "C" }] }] },
+      { name: "副歌", lines: [{ timeMs: 15_000, text: "第二句", chords: [{ at: 2, chord: "G" }] }] },
+    ],
+  };
+  const jazz: ChordAnnotation = {
+    ...annotation,
+    key: "C",
+    strumming: "swing",
+    notes: "加入七和弦",
+    // The AI tries to merge the sections; the server keeps the original ones.
+    sections: [{ name: "全曲", startLine: 0 }],
+    chords: [
+      { line: 0, at: 0, chord: "Cmaj7" },
+      { line: 1, at: 1, chord: "G7" },
+    ],
+  };
+
+  function rearrange(body: unknown) {
+    return worker.fetch(
+      new Request("https://api.test/songs/rearrange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-App-Token": "secret" },
+        body: JSON.stringify(body),
+      }),
+      env,
+    );
+  }
+
+  it("sends the current chords and style, keeps lyrics and sections, and marks the arrangement", async () => {
+    let prompt: any;
+    const hosts = stubNetwork(async (_host, req) => {
+      prompt = await req.json();
+      return Response.json(claudeMessage(jazz));
+    });
+    const res = await rearrange({ sheet, style: "爵士" });
+    expect(res.status).toBe(200);
+    expect(hosts).toEqual(["api.anthropic.com"]); // no lyrics lookup
+    const out: any = await res.json();
+    expect(out.arrangement).toEqual({ style: "爵士" });
+    expect(out.strumming).toBe("swing");
+    expect(out.sections).toEqual([
+      { name: "主歌", lines: [{ timeMs: 10_000, text: "第一句", chords: [{ at: 0, chord: "Cmaj7" }] }] },
+      { name: "副歌", lines: [{ timeMs: 15_000, text: "第二句", chords: [{ at: 1, chord: "G7" }] }] },
+    ]);
+    const user: string = prompt.messages[0].content;
+    expect(user).toContain("目标风格：爵士");
+    expect(user).toContain("0\t第一句\t0:C");
+    expect(user).toContain("副歌：从第 1 行开始");
+    expect(prompt.system).toContain("改编");
+  });
+
+  it("can use OpenAI", async () => {
+    const hosts = stubNetwork(async () => Response.json(openAIResponse(jazz)));
+    const res = await worker.fetch(
+      new Request("https://api.test/songs/rearrange", {
+        method: "POST",
+        headers: { "X-App-Token": "secret" },
+        body: JSON.stringify({ sheet, style: "民谣", provider: "openai" }),
+      }),
+      { ...env, OPENAI_API_KEY: "k" },
+    );
+    expect(res.status).toBe(200);
+    expect(hosts).toEqual(["api.openai.com"]);
+  });
+
+  it("rejects a missing style or a malformed sheet", async () => {
+    expect((await rearrange({ sheet, style: " " })).status).toBe(400);
+    expect((await rearrange({ sheet: { ...sheet, sections: [] }, style: "爵士" })).status).toBe(400);
+  });
+});

@@ -15,6 +15,8 @@ final class SavedSong {
     /// Semitones the song is shifted from the original key.
     var transpose: Int
     var capo: Int
+    /// The style of an AI rearrangement; nil for the original arrangement.
+    var arrangementStyle: String?
 
     init(sheet: SongSheet) {
         id = UUID()
@@ -25,6 +27,7 @@ final class SavedSong {
         sheetData = (try? JSONEncoder().encode(sheet)) ?? Data()
         transpose = 0
         capo = sheet.capo
+        arrangementStyle = sheet.arrangement?.style
     }
 
     var sheet: SongSheet? {
