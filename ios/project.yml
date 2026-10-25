@@ -36,4 +36,5 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: 连接你电脑上运行的曲谱后端。
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: 连接 LiberLive 智能吉他，读取你按下的和弦，让歌词跟着你的弹奏滚动。
     scheme: {}

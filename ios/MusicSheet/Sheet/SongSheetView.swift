@@ -1,7 +1,7 @@
 import MusicSheetKit
 import SwiftUI
 
-/// The practice screen: chords over lyrics, transposition and capo, and auto-scroll.
+/// The practice screen: chords over lyrics, transposition and capo, and auto-scroll by clock or by a LiberLive guitar.
 struct SongSheetView: View {
     @Bindable var song: SavedSong
     /// Saves and opens another song, such as a rearrangement of this one.
@@ -13,6 +13,9 @@ struct SongSheetView: View {
     @State private var clock = PracticeClock()
     @State private var editing: LineRef?
     @State private var showingRearrange = false
+    @Environment(GuitarConnection.self) private var guitar
+    /// Set while the sheet follows the chord buttons pressed on the guitar instead of the clock.
+    @State private var follower: ChordFollower?
 
     var body: some View {
         if let sheet = song.sheet {
@@ -25,7 +28,7 @@ struct SongSheetView: View {
     private func content(_ sheet: SongSheet) -> some View {
         let canSync = PracticeTimeline.canSync(sheet)
         let timeline = PracticeTimeline(sheet: sheet, mode: canSync ? mode : .tempo, barsPerLine: barsPerLine)
-        let activeIndex = timeline.lineIndex(at: clock.time)
+        let activeIndex = follower.map(\.currentLine) ?? timeline.lineIndex(at: clock.time)
         let key = MusicalKey(sheet.key)
         let format: (String) -> String = { [transpose = song.transpose, capo = song.capo, notation] in
             ChordFormatter.format($0, key: key, transpose: transpose, capo: capo, notation: notation)
@@ -49,7 +52,13 @@ struct SongSheetView: View {
                                 LyricLineView(line: line, formatChord: format, isActive: index == activeIndex)
                                     .id(index)
                                     .contentShape(.rect)
-                                    .onTapGesture { clock.seek(to: timeline.startTime(ofLine: index)) }
+                                    .onTapGesture {
+                                        if follower != nil {
+                                            follower?.jump(toLine: index)
+                                        } else {
+                                            clock.seek(to: timeline.startTime(ofLine: index))
+                                        }
+                                    }
                                     .contextMenu {
                                         Button("编辑和弦", systemImage: "pencil") { editing = ref }
                                         Button("从这句开始", systemImage: "play") {
@@ -65,7 +74,7 @@ struct SongSheetView: View {
                 .padding(.bottom, 80)
             }
             .onChange(of: activeIndex) { _, newValue in
-                guard clock.isRunning, let newValue else { return }
+                guard clock.isRunning || follower != nil, let newValue else { return }
                 // Keep the current line in the upper third so the next lines stay visible.
                 withAnimation(.easeInOut) { proxy.scrollTo(newValue, anchor: UnitPoint(x: 0.5, y: 0.3)) }
             }
@@ -85,6 +94,15 @@ struct SongSheetView: View {
         }
         .sheet(isPresented: $showingRearrange) {
             SignInGate { RearrangeView(sheet: sheet) { onOpen(SavedSong(sheet: $0)) } }
+        }
+        .onChange(of: guitar.lastPress) { _, press in
+            guard let press else { return }
+            follower?.press(press.chord)
+        }
+        .onChange(of: song.transpose) {
+            // Buttons are compared with the sounding chords, so rebuild at the same line.
+            guard follower != nil else { return }
+            startFollowing(sheet, from: activeIndex)
         }
         .onDisappear { clock.pause() }
     }
@@ -132,7 +150,9 @@ struct SongSheetView: View {
         let next = timeline.lines.indices.contains(nextIndex) ? sheet[timeline.lines[nextIndex]] : nil
 
         return VStack(spacing: 8) {
-            if let next {
+            if let follower {
+                followStatus(follower, key: MusicalKey(sheet.key))
+            } else if let next {
                 // What's coming up, so you can get your hand ready.
                 HStack(spacing: 6) {
                     Text("下一句").font(.caption).foregroundStyle(.secondary)
@@ -143,38 +163,94 @@ struct SongSheetView: View {
                     Spacer(minLength: 0)
                 }
             }
-            HStack(spacing: 16) {
-                Button { clock.seek(to: 0) } label: { Image(systemName: "backward.end.fill") }
-                Button { clock.toggle() } label: {
-                    Image(systemName: clock.isRunning ? "pause.circle.fill" : "play.circle.fill").font(.largeTitle)
-                }
-                Text(Duration.seconds(clock.time).formatted(.time(pattern: .minuteSecond)))
-                    .font(.callout.monospacedDigit())
-                Spacer()
-                Menu {
-                    Picker("速度", selection: $clock.rate) {
-                        ForEach([0.5, 0.75, 0.9, 1.0, 1.1, 1.25], id: \.self) { Text("\($0, specifier: "%g")×").tag($0) }
-                    }
-                } label: {
-                    Text("\(clock.rate, specifier: "%g")×").font(.callout.monospacedDigit())
-                }
-                if canSync {
-                    Picker("滚动方式", selection: $mode) {
-                        Text("跟原曲").tag(PracticeTimeline.Mode.synced)
-                        Text("按节拍").tag(PracticeTimeline.Mode.tempo)
-                    }
-                    .pickerStyle(.segmented)
-                    .fixedSize()
-                }
-            }
+            if follower == nil { playback(canSync: canSync) }
         }
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.bar)
     }
 
+    private func playback(canSync: Bool) -> some View {
+        HStack(spacing: 16) {
+            Button { clock.seek(to: 0) } label: { Image(systemName: "backward.end.fill") }
+            Button { clock.toggle() } label: {
+                Image(systemName: clock.isRunning ? "pause.circle.fill" : "play.circle.fill").font(.largeTitle)
+            }
+            Text(Duration.seconds(clock.time).formatted(.time(pattern: .minuteSecond)))
+                .font(.callout.monospacedDigit())
+            Spacer()
+            Menu {
+                Picker("速度", selection: $clock.rate) {
+                    ForEach([0.5, 0.75, 0.9, 1.0, 1.1, 1.25], id: \.self) { Text("\($0, specifier: "%g")×").tag($0) }
+                }
+            } label: {
+                Text("\(clock.rate, specifier: "%g")×").font(.callout.monospacedDigit())
+            }
+            if canSync {
+                Picker("滚动方式", selection: $mode) {
+                    Text("跟原曲").tag(PracticeTimeline.Mode.synced)
+                    Text("按节拍").tag(PracticeTimeline.Mode.tempo)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
+        }
+    }
+
+    /// What to press next while following the guitar.
+    private func followStatus(_ follower: ChordFollower, key: MusicalKey?) -> some View {
+        let flats = key?.transposed(by: song.transpose).prefersFlats ?? false
+        return HStack(spacing: 6) {
+            Image(systemName: "guitars.fill").foregroundStyle(guitar.isConnected ? Color.accentColor : .secondary)
+            if let next = follower.next {
+                Text("下一个和弦").font(.caption).foregroundStyle(.secondary)
+                Text(next.chord.name(preferFlats: flats)).font(.title3.weight(.bold)).foregroundStyle(Color.accentColor)
+            } else {
+                Text("弹完了，点任意一句可以从那里重来").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            if !guitar.isConnected { Text(guitarStatus).font(.caption).foregroundStyle(.secondary) }
+            Button("退出跟弹") { self.follower = nil }.font(.callout)
+        }
+    }
+
+    private var guitarStatus: String {
+        switch guitar.state {
+        case .idle: "吉他未连接"
+        case .unavailable(let reason): reason
+        case .scanning: "正在找吉他…"
+        case .connecting(let name): "正在连接 \(name)…"
+        case .connected(let name): "已连接 \(name)"
+        }
+    }
+
+    private func startFollowing(_ sheet: SongSheet, from line: Int?) {
+        clock.pause()
+        var next = ChordFollower(sheet: sheet, transpose: song.transpose)
+        if let line { next.jump(toLine: line) }
+        follower = next
+    }
+
     @ToolbarContentBuilder
     private func displayMenu(_ sheet: SongSheet) -> some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Text(guitarStatus)
+                if guitar.isConnected {
+                    Button(follower == nil ? "跟着吉他按键滚动" : "退出跟弹", systemImage: "hand.point.up.left") {
+                        if follower == nil { startFollowing(sheet, from: nil) } else { follower = nil }
+                    }
+                    Button("断开吉他", systemImage: "xmark.circle") { guitar.disconnect() }
+                } else {
+                    Button("连接 LiberLive 吉他", systemImage: "antenna.radiowaves.left.and.right") {
+                        guitar.connect()
+                        startFollowing(sheet, from: nil)
+                    }
+                }
+            } label: {
+                Label("吉他", systemImage: guitar.isConnected ? "guitars.fill" : "guitars")
+            }
+        }
         ToolbarItem(placement: .primaryAction) {
             Button {
                 clock.pause()
