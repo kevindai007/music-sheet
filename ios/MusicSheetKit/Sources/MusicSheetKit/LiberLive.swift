@@ -76,7 +76,7 @@ public enum LiberLive {
         }
     }
 
-    /// A chord button pressed on the guitar ("noti_chord").
+    /// A pick played on the guitar ("noti_chord"), with the chord button held at the time.
     public struct ChordPress: Equatable, Sendable {
         public enum Quality: Equatable, Sendable {
             case major, minor, diminished
@@ -85,12 +85,14 @@ public enum LiberLive {
 
         public var root: PitchClass
         public var quality: Quality
+        /// Which of the guitar's two picks was played (each can have its own pattern, e.g. picking or strumming).
+        public var pick: Int
         /// Raw event bytes, kept for fields we don't understand yet.
         public var raw: [UInt8]
 
         public init?(_ frame: Frame) {
             let a = Array(frame.arguments)
-            guard frame.direction == .fromGuitar, frame.name == "noti_chord", a.count >= 4, a[1] == 1 else { return nil }
+            guard frame.direction == .fromGuitar, frame.name == "noti_chord", a.count >= 6, a[1] == 1 else { return nil }
             root = PitchClass(Int(a[0]))
             switch a[3] {
             case 0: quality = .major
@@ -98,6 +100,7 @@ public enum LiberLive {
             case 3: quality = .diminished
             default: quality = .other(a[3])
             }
+            pick = Int(a[5])
             raw = a
         }
 

@@ -9,7 +9,7 @@ private func frame(_ hex: String) -> Data {
 }
 
 @Suite struct LiberLiveTests {
-    // Real "noti_chord" frames from a LiberLive C2, one per diatonic button in C (C Dm Em F G Am B°).
+    // Real "noti_chord" frames from a LiberLive C2: a pick played while holding each diatonic button in C (C Dm Em F G Am B°).
     static let presses: [(String, Int, LiberLive.ChordPress.Quality, String)] = [
         ("244124c015249bfe12f3e81e1e791f00e9a954de3d12a161700f6691cca23ab1497b94ae", 0, .major, "C"),
         ("244124c091e8dca96031b63d6e801f00482d98996a60633f537f9f91ce26f4f71e099c7f", 2, .minor, "Dm"),
@@ -28,6 +28,7 @@ private func frame(_ hex: String) -> Data {
         let press = try #require(LiberLive.ChordPress(f))
         #expect(press.root.value == root)
         #expect(press.quality == quality)
+        #expect(press.pick == 0)
         #expect(press.chord.name(preferFlats: false) == name)
     }
 
@@ -88,16 +89,23 @@ private func frame(_ hex: String) -> Data {
         #expect(follower.next?.chord == Chord("C"))
     }
 
-    @Test func ignoresWrongChordsAndSkipsAMissedOne() {
+    @Test func ignoresWrongChordsAndRepeatedStrums() {
         var follower = ChordFollower(sheet: twinkle)
-        let moved1 = follower.press(Chord("Am")!)
-        #expect(!moved1)
-        #expect(follower.position == 0)
-        // C, then the player misses F and plays the following C: still in place.
+        let wrong = follower.press(Chord("Am")!)
+        #expect(!wrong && follower.position == 0)
+        // C F C: strumming C again must not skip the F to reach the second C.
         follower.press(Chord("C")!)
-        let moved2 = follower.press(Chord("C")!)
-        #expect(moved2)
-        #expect(follower.position == 3)
+        let again = follower.press(Chord("C")!)
+        #expect(!again && follower.position == 1)
+    }
+
+    @Test func recoversFromAMissedChange() {
+        var follower = ChordFollower(sheet: twinkle)
+        for name in ["C", "F", "C"] { follower.press(Chord(name)!) }
+        // Next come F, C, G: the player misses F and C and plays G.
+        let moved = follower.press(Chord("G")!)
+        #expect(moved && follower.position == 6)
+        #expect(follower.currentLine == 1)
     }
 
     @Test func comparesTriadsInTheSoundingKey() {
@@ -107,20 +115,18 @@ private func frame(_ hex: String) -> Data {
         )
         var follower = ChordFollower(sheet: sheet, transpose: 2)
         // Em7 up two semitones is F#m7; the guitar's F#m button matches it, and D/F# becomes E.
-        let moved3 = follower.press(Chord("F#m")!)
-        #expect(moved3)
-        let moved4 = follower.press(Chord("D")!)
-        #expect(!moved4)
-        let moved5 = follower.press(Chord("E")!)
-        #expect(moved5)
+        let minor = follower.press(Chord("F#m")!)
+        let wrongBass = follower.press(Chord("D")!)
+        #expect(minor && !wrongBass)
+        let slash = follower.press(Chord("E")!)
+        #expect(slash)
     }
 
     @Test func jumpsToATappedLine() {
         var follower = ChordFollower(sheet: twinkle)
         follower.jump(toLine: 3)
         #expect(follower.next?.line == 3)
-        let moved6 = follower.press(Chord("C")!)
-        #expect(moved6)
-        #expect(follower.currentLine == 3)
+        let moved = follower.press(Chord("C")!)
+        #expect(moved && follower.currentLine == 3)
     }
 }

@@ -46,8 +46,11 @@ e.g. `05 01 00`, `09 08 00`, `00 00 00`; likely the chord hint shown on the neck
 * `01 0f` query (reply `06 01 01 02 01 03 01 04 00 05 00 06 00`), `01 06`, `01 08`, `01 0a`, `01 16` setup.
 
 ### Notifications
-* `noti_chord`: `[root][1=press 0=release][root][quality][0][?]`, root = semitone (C=0 D=2 E=4 F=5 G=7
-  A=9 B=11), quality 0=major 1=minor 3=dim. Verified with the 7 diatonic buttons C Dm Em F G Am B°.
+* `noti_chord`: sent each time a pick is played (not when a chord button is pressed or held), with the
+  chord button held at the time: `[root][01][root][quality][00][pick]`. root = semitone (C=0 D=2 E=4 F=5 G=7
+  A=9 B=11), quality 0=major 1=minor 3=dim, pick = which of the guitar's two picks (0/1; each can carry its
+  own pattern, e.g. picking vs strumming). The second byte has always been 01. Verified with the 7 diatonic
+  buttons C Dm Em F G Am B°.
 * `noti_basic`: status, ~10 Hz. Not decoded yet.
 * `noti_event`: misc events (e.g. `04 00`). Not decoded yet.
 

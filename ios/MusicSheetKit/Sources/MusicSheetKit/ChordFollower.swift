@@ -1,7 +1,8 @@
 import Foundation
 
-/// Follows a song by the chord buttons pressed on a LiberLive guitar: each press that matches the next chord change
-/// moves the position forward, so the sheet scrolls with the player instead of a clock.
+/// Follows a song by what is played on a LiberLive guitar: the guitar reports the held chord button every time a pick
+/// is played, and each report that matches the next chord change moves the position forward, so the sheet scrolls
+/// with the player instead of a clock.
 public struct ChordFollower: Sendable {
     public struct Step: Equatable, Sendable {
         /// Index into `SongSheet.allLines`.
@@ -15,7 +16,7 @@ public struct ChordFollower: Sendable {
     /// Index into `steps` of the chord the player should press next.
     public private(set) var position = 0
 
-    /// How many steps ahead a press may match, so one missed or extra change doesn't lose the place.
+    /// How many steps ahead a strum may match, so one missed change doesn't lose the place.
     static let lookahead = 2
 
     /// - Parameter transpose: semitones the song is shifted, so the buttons are compared with the sounding chords.
@@ -41,9 +42,11 @@ public struct ChordFollower: Sendable {
         position > 0 ? steps[position - 1].line : nil
     }
 
-    /// Handles a button press. Returns true when it matched and the position moved.
+    /// Handles a strum of `chord`. Returns true when it matched and the position moved.
     @discardableResult
     public mutating func press(_ chord: Chord) -> Bool {
+        // Strumming on with the same chord is the player staying put, not the chord's next appearance.
+        if position > 0, Self.sameButton(steps[position - 1].chord, chord) { return false }
         let end = min(position + Self.lookahead + 1, steps.count)
         guard let hit = (position..<end).first(where: { Self.sameButton(steps[$0].chord, chord) }) else { return false }
         position = hit + 1

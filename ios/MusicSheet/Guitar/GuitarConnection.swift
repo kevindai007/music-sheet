@@ -2,7 +2,7 @@
 import MusicSheetKit
 import Observation
 
-/// Connects to a LiberLive C2 over Bluetooth LE and reports the chord buttons pressed on it.
+/// Connects to a LiberLive C2 over Bluetooth LE and reports the held chord each time a pick is played.
 /// Read-only: it subscribes to the guitar's events and never writes a command.
 @MainActor
 @Observable
@@ -21,7 +21,7 @@ final class GuitarConnection: NSObject {
     }
 
     private(set) var state: State = .idle
-    /// The latest button press; observe its `id` to react to every press, including repeats of the same chord.
+    /// The latest strum; observe its `id` to react to every one, including repeats of the same chord.
     private(set) var lastPress: Press?
 
     @ObservationIgnored private var central: CBCentralManager?
